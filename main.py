@@ -1,14 +1,15 @@
 import os
 import requests
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict
 import uvicorn
 
 app = FastAPI()
 token = os.getenv("DISCORD_BOT_TOKEN")
-category_id = os.getenv("DISCORD_USERS_CATEGORY_ID")
 guild_id = os.getenv("DISCORD_GUILD_ID")
+category_id = os.getenv("DISCORD_USERS_CATEGORY_ID")
+allowed_role_id = os.getenv("DISCORD_ALLOWED_ROLE_ID")
 headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
 user_channels = {}
 cmd_queue: Dict[str, List[Dict[str, str]]] = {}
@@ -28,21 +29,22 @@ class Disconnect(BaseModel):
 @app.post("/info_report")
 async def info_report(info: Info):
     if info.userid not in user_channels:
-        payload = {
-            "name": info.userid,
-            "type": 0,
-            "parent_id": category_id
-        }
+        payload = {"name": info.userid, "type": 0, "parent_id": category_id}
         r = requests.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels", headers=headers, json=payload)
         if r.status_code == 201:
             channel_id = r.json()["id"]
             user_channels[info.userid] = channel_id
+            requests.post(
+                f"https://discord.com/api/v10/channels/{channel_id}/messages",
+                headers=headers,
+                json={"content": f"<@&{allowed_role_id}> online"}
+            )
         else:
             return {"error": "failed to create channel"}
     else:
         channel_id = user_channels[info.userid]
     embed = {
-        "title": "Player Joined",
+        "title": "Player Info",
         "color": 5763719,
         "thumbnail": {"url": info.thumbnail},
         "fields": [
@@ -67,18 +69,37 @@ async def poll(userid: str):
 
 @app.post("/disconnect")
 async def disconnect(info: Disconnect):
-    cmd_queue.pop(info.userid, None)
     if info.userid in user_channels:
         channel_id = user_channels[info.userid]
         requests.post(
             f"https://discord.com/api/v10/channels/{channel_id}/messages",
             headers=headers,
-            json={"content": f"User `{info.userid}` disconnected."}
+            json={"content": "offline (deleting ts)"}
         )
+        requests.delete(f"https://discord.com/api/v10/channels/{channel_id}", headers=headers)
+        user_channels.pop(info.userid, None)
+    cmd_queue.pop(info.userid, None)
     return {"status": "ok"}
 
 @app.post("/send_command/{userid}")
-async def send_command(userid: str, cmd: Dict[str, str]):
+async def send_command(userid: str, request: Request):
+    auth = request.headers.get("Authorization")
+    if not auth or not auth.startswith("Bot "):
+        raise HTTPException(status_code=401)
+    requester = requests.get("https://discord.com/api/v10/users/@me", headers={"Authorization": auth}).json()
+    if "id" not in requester:
+        raise HTTPException(status_code=403)
+    r = requests.get(f"https://discord.com/api/v10/users/@me/guilds", headers={"Authorization": auth}).json()
+    is_allowed = False
+    for g in r:
+        if g["id"] == guild_id:
+            member = requests.get(f"https://discord.com/api/v10/guilds/{guild_id}/members/{requester['id']}", headers=headers).json()
+            if "roles" in member and allowed_role_id in member["roles"]:
+                is_allowed = True
+            break
+    if not is_allowed:
+        raise HTTPException(status_code=403)
+    cmd = await request.json()
     if userid not in cmd_queue:
         cmd_queue[userid] = []
     cmd_queue[userid].append(cmd)
