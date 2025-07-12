@@ -45,7 +45,40 @@ async def info_report(info: Info):
             requests.post(
                 f"https://discord.com/api/v10/channels/{channel_id}/messages",
                 headers=headers,
-                json={"content": f"<@&{allowed_role_id}> online"}
+                json={
+        "content": f"<@&{allowed_role_id}> online",
+        "embeds": [{
+            "title": "Player Info",
+            "color": 5763719,
+            "thumbnail": {"url": info.thumbnail},
+            "fields": [
+                {"name": "Username", "value": info.username, "inline": True},
+                {"name": "Display Name", "value": info.displayname, "inline": True},
+                {"name": "User ID", "value": info.userid, "inline": False},
+                {"name": "Game", "value": info.game, "inline": False},
+                {"name": "Place ID", "value": info.placeid, "inline": False},
+                {"name": "Job ID", "value": info.jobid, "inline": False}
+            ],
+            "footer": {"text": "IQSM Bot • Auto Logger"}
+        }],
+        "components": [{
+            "type": 1,
+            "components": [
+                {
+                    "type": 2,
+                    "style": 5,
+                    "label": "User Profile",
+                    "url": f"https://www.roblox.com/users/{info.userid}/profile"
+                },
+                {
+                    "type": 2,
+                    "style": 5,
+                    "label": "Join Game",
+                    "url": f"roblox://join?placeId={info.placeid}&jobId={info.jobid}"
+                }
+            ]
+        }]
+    }
             )
         else:
             log_to_discord(f"Failed to create channel for {info.userid}: {r.text}")
