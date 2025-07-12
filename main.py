@@ -77,7 +77,7 @@ async def info_report(info: Info):
                     "type": 2,
                     "style": 5,
                     "label": "Join Game",
-                    "url": f"roblox://join?placeId={info.placeid}&jobId={info.jobid}"
+                    "url": f"https://www.roblox.com/games/{info.placeid}/join?jobId={info.jobid}"
                 }
             ]
         }]
