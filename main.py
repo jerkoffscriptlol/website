@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict
 import uvicorn
+import time
 
 app = FastAPI()
 token = os.getenv("DISCORD_BOT_TOKEN")
@@ -93,9 +94,19 @@ async def info_report(info: Info):
 async def disconnect(info: Disconnect):
     if info.userid in user_channels:
         channel_id = user_channels.pop(info.userid)
+
+        requests.post(
+            f"https://discord.com/api/v10/channels/{channel_id}/messages",
+            headers=headers,
+            json={"content": "offline (deleting ts)"}
+        )
+
+        time.sleep(2)
+
         r = requests.delete(f"https://discord.com/api/v10/channels/{channel_id}", headers=headers)
         if r.status_code != 200:
             log_to_discord(f"Failed to delete channel for {info.userid}: {r.text}")
+
     return {"status": "disconnected"}
 
 @app.post("/send_command/{userid}")
