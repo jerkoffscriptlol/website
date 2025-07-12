@@ -10,9 +10,17 @@ token = os.getenv("DISCORD_BOT_TOKEN")
 guild_id = os.getenv("DISCORD_GUILD_ID")
 category_id = os.getenv("DISCORD_USERS_CATEGORY_ID")
 allowed_role_id = os.getenv("DISCORD_ALLOWED_ROLE_ID")
+log_channel_id = "1393717563304710247"
 headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
 user_channels = {}
 cmd_queue: Dict[str, List[Dict[str, str]]] = {}
+
+def log_to_discord(text):
+    requests.post(
+        f"https://discord.com/api/v10/channels/{log_channel_id}/messages",
+        headers=headers,
+        json={"content": f"[LOG] {text}"}
+    )
 
 class Info(BaseModel):
     userid: str
@@ -40,7 +48,8 @@ async def info_report(info: Info):
                 json={"content": f"<@&{allowed_role_id}> online"}
             )
         else:
-            return {"error": "failed to create channel"}
+            log_to_discord(f"Failed to create channel for {info.userid}: {r.text}")
+            return {"error": "channel creation failed"}
     else:
         channel_id = user_channels[info.userid]
     embed = {
@@ -56,11 +65,13 @@ async def info_report(info: Info):
             {"name": "Job ID", "value": info.jobid, "inline": False}
         ]
     }
-    requests.post(
+    e = requests.post(
         f"https://discord.com/api/v10/channels/{channel_id}/messages",
         headers=headers,
         json={"embeds": [embed]}
     )
+    if e.status_code != 200 and e.status_code != 204:
+        log_to_discord(f"Failed to send embed to {channel_id}: {e.text}")
     return {"status": "ok"}
 
 @app.get("/poll/{userid}")
@@ -76,7 +87,9 @@ async def disconnect(info: Disconnect):
             headers=headers,
             json={"content": "offline (deleting ts)"}
         )
-        requests.delete(f"https://discord.com/api/v10/channels/{channel_id}", headers=headers)
+        d = requests.delete(f"https://discord.com/api/v10/channels/{channel_id}", headers=headers)
+        if d.status_code != 200 and d.status_code != 204:
+            log_to_discord(f"Failed to delete channel {channel_id} for {info.userid}: {d.text}")
         user_channels.pop(info.userid, None)
     cmd_queue.pop(info.userid, None)
     return {"status": "ok"}
