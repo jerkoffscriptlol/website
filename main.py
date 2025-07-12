@@ -52,6 +52,7 @@ async def info_report(info: Info):
             return {"error": "channel creation failed"}
     else:
         channel_id = user_channels[info.userid]
+
     embed = {
         "title": "Player Info",
         "color": 5763719,
@@ -65,13 +66,36 @@ async def info_report(info: Info):
             {"name": "Job ID", "value": info.jobid, "inline": False}
         ]
     }
+
+    components = [
+        {
+            "type": 1,
+            "components": [
+                {
+                    "type": 2,
+                    "style": 5,
+                    "label": "View Profile",
+                    "url": f"https://www.roblox.com/users/{info.userid}/profile"
+                },
+                {
+                    "type": 2,
+                    "style": 5,
+                    "label": "Join Game",
+                    "url": f"roblox://placeID={info.placeid}&gameInstanceId={info.jobid}"
+                }
+            ]
+        }
+    ]
+
     e = requests.post(
         f"https://discord.com/api/v10/channels/{channel_id}/messages",
         headers=headers,
-        json={"embeds": [embed]}
+        json={"embeds": [embed], "components": components}
     )
+
     if e.status_code != 200 and e.status_code != 204:
         log_to_discord(f"Failed to send embed to {channel_id}: {e.text}")
+
     return {"status": "ok"}
 
 @app.get("/poll/{userid}")
