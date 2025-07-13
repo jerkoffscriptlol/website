@@ -2,9 +2,10 @@ import os
 import time
 import threading
 import requests
+import json
 from typing import List, Dict
 from fastapi import FastAPI, Request, HTTPException, Depends
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from dotenv import load_dotenv
@@ -26,7 +27,6 @@ logs = []
 last_ping = {}
 security = HTTPBearer()
 
-
 class Info(BaseModel):
     userid: str
     username: str
@@ -36,10 +36,8 @@ class Info(BaseModel):
     jobid: str
     thumbnail: str
 
-
 class Disconnect(BaseModel):
     userid: str
-
 
 @app.post("/info_report")
 async def info_report(info: Info, request: Request):
@@ -50,7 +48,6 @@ async def info_report(info: Info, request: Request):
         log["ip"] = ip
         logs.append(log)
     last_ping[info.userid] = time.time()
-
     if info.userid in user_channels:
         return {"detail": "Channel already exists"}
 
@@ -81,7 +78,8 @@ async def info_report(info: Info, request: Request):
             {"name": "User ID", "value": info.userid or "N/A", "inline": False},
             {"name": "Game", "value": info.game or "N/A", "inline": False},
             {"name": "Place ID", "value": info.placeid or "N/A", "inline": False},
-            {"name": "Job ID", "value": info.jobid or "N/A", "inline": False}
+            {"name": "Job ID", "value": info.jobid or "N/A", "inline": False},
+            {"name": "IP Address", "value": ip, "inline": False}
         ],
         "thumbnail": {
             "url": info.thumbnail if info.thumbnail.startswith("https://") else "https://tr.rbxcdn.com/default_thumbnail.png"
@@ -112,23 +110,18 @@ async def info_report(info: Info, request: Request):
         ]
     }
 
-    message_response = requests.post(
+    requests.post(
         f"https://discord.com/api/v10/channels/{channel_id}/messages",
         headers=headers,
         json=message_payload
     )
 
-    if message_response.status_code not in [200, 201, 204]:
-        raise HTTPException(status_code=500, detail="Failed to send message")
-
     return {"detail": "Channel and message sent"}
-
 
 @app.post("/ping")
 async def ping_user(ping: Disconnect):
     last_ping[ping.userid] = time.time()
     return {"detail": "Ping OK"}
-
 
 @app.post("/disconnect")
 async def disconnect(disconnect: Disconnect):
@@ -148,13 +141,20 @@ async def disconnect(disconnect: Disconnect):
         last_ping.pop(user_id, None)
     return {"detail": "Channel deleted if existed"}
 
-
 @app.get("/logs")
 async def get_logs(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if credentials.credentials != dashboard_password:
         raise HTTPException(status_code=403, detail="Unauthorized")
     return logs
 
+@app.get("/download_logs")
+async def download_logs(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if credentials.credentials != dashboard_password:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    path = "/tmp/all_logs.json"
+    with open(path, "w") as f:
+        json.dump(logs, f, indent=2)
+    return FileResponse(path, media_type="application/json", filename="logs.json")
 
 @app.post("/auth")
 async def auth(req: Dict[str, str]):
@@ -162,13 +162,11 @@ async def auth(req: Dict[str, str]):
         raise HTTPException(status_code=401, detail="Invalid password")
     return {"message": "Authorized"}
 
-
 @app.delete("/logs/{userid}")
 async def delete_log(userid: str, creds: HTTPAuthorizationCredentials = Depends(security)):
     global logs
     logs = [log for log in logs if log["userid"] != userid]
     return {"detail": "Deleted"}
-
 
 @app.post("/send_log/{userid}")
 async def send_log(userid: str, creds: HTTPAuthorizationCredentials = Depends(security)):
@@ -183,7 +181,8 @@ async def send_log(userid: str, creds: HTTPAuthorizationCredentials = Depends(se
                     {"name": "User ID", "value": log["userid"] or "N/A", "inline": False},
                     {"name": "Game", "value": log["game"] or "N/A", "inline": False},
                     {"name": "Place ID", "value": log["placeid"] or "N/A", "inline": False},
-                    {"name": "Job ID", "value": log["jobid"] or "N/A", "inline": False}
+                    {"name": "Job ID", "value": log["jobid"] or "N/A", "inline": False},
+                    {"name": "IP Address", "value": log["ip"] or "N/A", "inline": False}
                 ],
                 "thumbnail": {
                     "url": log["thumbnail"] if log["thumbnail"].startswith("https://") else "https://tr.rbxcdn.com/default_thumbnail.png"
@@ -221,7 +220,6 @@ async def send_log(userid: str, creds: HTTPAuthorizationCredentials = Depends(se
             )
             return {"detail": "Sent"}
     raise HTTPException(status_code=404, detail="Log not found")
-
 
 def monitor_disconnects():
     while True:
