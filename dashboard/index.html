@@ -1,40 +1,20 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>iqsm Dashboard</title>
-  <link rel="stylesheet" href="style.css">
+  <title>Logs Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="container">
-    <div id="login">
-      <h1>Login</h1>
-      <input type="password" id="password" placeholder="Password" />
-      <button onclick="login()">Login</button>
-    </div>
-
-    <div id="dashboard" class="hidden">
-      <h1>Logs</h1>
-      <table id="logTable">
-        <thead>
-          <tr>
-            <th>Thumbnail</th>
-            <th>Username</th>
-            <th>Display Name</th>
-            <th>User ID</th>
-            <th>Game</th>
-            <th>Place ID</th>
-            <th>Job ID</th>
-            <th>IP</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
+  <div id="login">
+    <h1>Login</h1>
+    <input type="password" id="password" placeholder="Enter Password">
+    <button onclick="auth()">Login</button>
   </div>
-
+  <div id="dashboard" class="hidden">
+    <h1>Player Logs</h1>
+    <div id="logs-container"></div>
+  </div>
   <script src="script.js"></script>
 </body>
 </html>
