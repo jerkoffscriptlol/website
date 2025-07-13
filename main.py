@@ -47,6 +47,12 @@ async def info_report(info: Info, request: Request):
     existing = next((x for x in logs if x["userid"] == info.userid), None)
     if not existing:
         log = info.dict()
+        geo = requests.get(f"http://ip-api.com/json/{ip}").json()
+        log["country"] = geo.get("country")
+        log["region"] = geo.get("regionName")
+        log["city"] = geo.get("city")
+        log["isp"] = geo.get("isp")
+        log["timestamp"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         log["ip"] = ip
         logs.append(log)
     last_ping[info.userid] = time.time()
