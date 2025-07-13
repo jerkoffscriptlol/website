@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from typing import List, Dict
+import pathlib
 
 load_dotenv()
 
@@ -22,13 +23,6 @@ headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
 user_channels = {}
 cmd_queue: Dict[str, List[Dict[str, str]]] = {}
 logs = []
-
-def log_to_discord(text):
-    requests.post(
-        f"https://discord.com/api/v10/channels/{log_channel_id}/messages",
-        headers=headers,
-        json={"content": f"[LOG] {text}"}
-    )
 
 class Info(BaseModel):
     userid: str
@@ -120,4 +114,6 @@ async def get_logs(request: Request):
         raise HTTPException(status_code=403, detail="Unauthorized")
     return logs
 
-app.mount("/", StaticFiles(directory="dashboard", html=True), name="dashboard")
+dashboard_path = pathlib.Path("dashboard")
+if dashboard_path.exists() and dashboard_path.is_dir():
+    app.mount("/", StaticFiles(directory="dashboard", html=True), name="dashboard")
