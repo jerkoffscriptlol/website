@@ -1,111 +1,79 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>iqsm. Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <title>notarat Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
-      background-color: #0e0e0e;
-      color: #fff;
-      font-family: 'Segoe UI', sans-serif;
+      background-color: #0f0f0f;
+      color: white;
+      font-family: Arial, sans-serif;
       margin: 0;
       padding: 2rem;
     }
-    #login, #dashboard {
-      max-width: 900px;
-      margin: auto;
-      background: #1c1c1c;
-      padding: 2rem;
-      border-radius: 12px;
-      box-shadow: 0 0 20px rgba(255,255,255,0.05);
-    }
-    input, button {
-      padding: 0.75rem 1rem;
-      font-size: 1rem;
-      margin: 0.5rem 0;
-      border: none;
-      border-radius: 6px;
-    }
-    input[type="password"], input[type="text"] {
-      width: 100%;
-      background: #111;
-      color: #fff;
+    .hidden { display: none; }
+    .card {
+      background-color: #1a1a1a;
+      border-radius: 10px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 0 5px rgba(0,0,0,0.2);
     }
     button {
-      background-color: #333;
-      color: #fff;
+      background-color: #3b82f6;
+      border: none;
+      border-radius: 5px;
+      padding: 0.5rem 1rem;
+      color: white;
       cursor: pointer;
-    }
-    button:hover {
-      background-color: #555;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 1rem;
-    }
-    th, td {
-      padding: 0.75rem;
-      border-bottom: 1px solid #444;
-      text-align: left;
-      vertical-align: middle;
-    }
-    .thumb {
-      height: 50px;
-      width: 50px;
-      border-radius: 6px;
-    }
-    .actions button {
       margin-right: 0.5rem;
     }
-    .hidden {
-      display: none;
+    button:hover {
+      background-color: #2563eb;
     }
-    #logModal {
-      background: #111;
-      padding: 2rem;
-      max-width: 600px;
-      margin: 2rem auto;
+    input {
+      background: #1f1f1f;
+      color: white;
+      padding: 0.5rem;
+      border: none;
+      border-radius: 5px;
+      margin-right: 1rem;
+    }
+    .log-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .log-item {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    img.thumb {
+      width: 80px;
+      height: 80px;
       border-radius: 10px;
-      border: 1px solid #444;
+      object-fit: cover;
     }
   </style>
 </head>
 <body>
   <div id="login">
-    <h2>Enter Dashboard Password</h2>
-    <input type="password" id="password" placeholder="Enter password..." />
-    <button onclick="login()">Login</button>
-    <p id="error" style="color:red;"></p>
+    <h1 style="font-size: 1.5rem; margin-bottom: 1rem;">Enter Password</h1>
+    <input type="password" id="pwd" placeholder="Password">
+    <button onclick="auth()">Login</button>
+    <p id="err" style="color: red; margin-top: 1rem;"></p>
   </div>
 
   <div id="dashboard" class="hidden">
-    <h2>iqsm. Logs</h2>
-    <input type="text" id="search" placeholder="Search by username..." oninput="loadLogs()" />
-    <table id="logTable">
-      <thead>
-        <tr>
-          <th>Thumbnail</th>
-          <th>Username</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
-
-  <div id="logModal" class="hidden">
-    <h3>Log Details</h3>
-    <pre id="logDetails" style="white-space: pre-wrap;"></pre>
-    <button onclick="closeModal()">Close</button>
+    <h1 style="font-size: 2rem; margin-bottom: 2rem;">📋 Logged Players</h1>
+    <div id="logs" class="log-grid"></div>
   </div>
 
   <script>
-    let logs = [];
-
-    async function login() {
-      const pwd = document.getElementById("password").value;
+    async function auth() {
+      const pwd = document.getElementById("pwd").value;
       const res = await fetch("/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -117,90 +85,56 @@
         document.getElementById("dashboard").classList.remove("hidden");
         loadLogs();
       } else {
-        document.getElementById("error").innerText = "Incorrect password.";
+        document.getElementById("err").innerText = "Wrong password";
       }
     }
 
     async function loadLogs() {
+      const logsContainer = document.getElementById("logs");
+      logsContainer.innerHTML = "Loading...";
       const res = await fetch("/logs", {
         headers: { "Authorization": sessionStorage.getItem("auth") }
       });
-      logs = await res.json();
-      const query = document.getElementById("search").value.toLowerCase();
-      const table = document.querySelector("#logTable tbody");
-      table.innerHTML = "";
-      logs.filter(entry => entry.username.toLowerCase().includes(query)).forEach((entry, i) => {
-        const row = document.createElement("tr");
-
-        const thumb = document.createElement("td");
-        thumb.innerHTML = `<img src="${entry.thumbnail}" class="thumb" />`;
-
-        const username = document.createElement("td");
-        username.textContent = entry.username;
-
-        const actions = document.createElement("td");
-        actions.className = "actions";
-
-        const viewBtn = document.createElement("button");
-        viewBtn.textContent = "View";
-        viewBtn.onclick = () => showLogDetails(i);
-
-        const deleteBtn = document.createElement("button");
-        deleteBtn.textContent = "Delete";
-        deleteBtn.onclick = () => deleteLog(entry.userid);
-
-        const sendBtn = document.createElement("button");
-        sendBtn.textContent = "Send";
-        sendBtn.onclick = () => sendToDiscord(entry.userid);
-
-        actions.appendChild(viewBtn);
-        actions.appendChild(deleteBtn);
-        actions.appendChild(sendBtn);
-
-        row.appendChild(thumb);
-        row.appendChild(username);
-        row.appendChild(actions);
-        table.appendChild(row);
-      });
-    }
-
-    function showLogDetails(index) {
-      const entry = logs[index];
-      const details = `
-Username: ${entry.username}
-Display Name: ${entry.displayname}
-User ID: ${entry.userid}
-Game: ${entry.game}
-Place ID: ${entry.placeid}
-Job ID: ${entry.jobid}
-IP Address: ${entry.ip}
-Thumbnail: ${entry.thumbnail}
-      `;
-      document.getElementById("logDetails").innerText = details;
-      document.getElementById("logModal").classList.remove("hidden");
-    }
-
-    function closeModal() {
-      document.getElementById("logModal").classList.add("hidden");
+      const data = await res.json();
+      logsContainer.innerHTML = "";
+      for (const log of data.reverse()) {
+        const el = document.createElement("div");
+        el.className = "card log-item";
+        el.innerHTML = `
+          <img src="${log.thumbnail}" class="thumb">
+          <div>
+            <p><b>${log.username}</b> (${log.displayname})</p>
+            <p style="font-size: 0.9rem;">Game: ${log.game}</p>
+            <p style="font-size: 0.8rem; color: gray;">Place ID: ${log.placeid} • Job ID: ${log.jobid}</p>
+            <div style="margin-top: 0.5rem;">
+              <button onclick="sendLog('${log.userid}')">📨 View</button>
+              <button onclick="deleteLog('${log.userid}')">🗑️ Delete</button>
+            </div>
+          </div>
+        `;
+        logsContainer.appendChild(el);
+      }
     }
 
     async function deleteLog(userid) {
       await fetch(`/logs/${userid}`, {
         method: "DELETE",
-        headers: {
-          "Authorization": sessionStorage.getItem("auth")
-        }
+        headers: { "Authorization": sessionStorage.getItem("auth") }
       });
       loadLogs();
     }
 
-    async function sendToDiscord(userid) {
+    async function sendLog(userid) {
       await fetch(`/send_log/${userid}`, {
         method: "POST",
-        headers: {
-          "Authorization": sessionStorage.getItem("auth")
-        }
+        headers: { "Authorization": sessionStorage.getItem("auth") }
       });
+    }
+
+    if (sessionStorage.getItem("auth")) {
+      document.getElementById("login").classList.add("hidden");
+      document.getElementById("dashboard").classList.remove("hidden");
+      loadLogs();
     }
   </script>
 </body>
