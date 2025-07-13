@@ -54,3 +54,8 @@ body {
 .actions a:hover, .actions button:hover {
   background: #555;
 }
+
+.actions input[type="file"] {
+  margin-top: 10px;
+  color: white;
+}
