@@ -3,9 +3,10 @@ import requests
 import pathlib
 from typing import List, Dict
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
@@ -17,11 +18,14 @@ guild_id = os.getenv("DISCORD_GUILD_ID")
 category_id = os.getenv("DISCORD_USERS_CATEGORY_ID")
 allowed_role_id = os.getenv("DISCORD_ALLOWED_ROLE_ID")
 dashboard_password = os.getenv("DASHBOARD_PASSWORD")
+admin_role_id = os.getenv("DISCORD_ADMIN_ROLE_ID")
 log_channel_id = "1393717563304710247"
 headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
 
 user_channels = {}
 logs = []
+security = HTTPBearer()
+
 
 class Info(BaseModel):
     userid: str
@@ -32,95 +36,73 @@ class Info(BaseModel):
     jobid: str
     thumbnail: str
 
+
 class Disconnect(BaseModel):
     userid: str
+
 
 @app.post("/info_report")
 async def info_report(info: Info, request: Request):
     ip = request.client.host
-    logs.append({
-        "username": info.username,
-        "userid": info.userid,
-        "displayname": info.displayname,
-        "game": info.game,
-        "placeid": info.placeid,
-        "jobid": info.jobid,
-        "thumbnail": info.thumbnail,
-        "ip": ip
-    })
+    log = info.dict()
+    log["ip"] = ip
+    logs.append(log)
 
-    print(f"[INFO_REPORT RECEIVED] {info.username} ({info.userid})")
+    message = {
+        "content": f"<@&{admin_role_id}>",
+        "embeds": [{
+            "title": info.username,
+            "description": f"{info.displayname} is playing **{info.game}**\nPlace ID: {info.placeid}\nJob ID: {info.jobid}",
+            "thumbnail": {"url": info.thumbnail}
+        }]
+    }
 
-    if info.userid not in user_channels:
-        payload = {"name": info.userid, "type": 0, "parent_id": category_id}
-        r = requests.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels", headers=headers, json=payload)
-        if r.status_code == 201:
-            channel_id = r.json()["id"]
-            user_channels[info.userid] = channel_id
-            requests.post(
-                f"https://discord.com/api/v10/channels/{channel_id}/messages",
-                headers=headers,
-                json={
-                    "content": f"<@&{allowed_role_id}>",
-                    "embeds": [{
-                        "title": f"{info.displayname} joined",
-                        "thumbnail": {"url": info.thumbnail},
-                        "fields": [
-                            {"name": "Username", "value": info.username},
-                            {"name": "User ID", "value": info.userid},
-                            {"name": "Game", "value": info.game},
-                            {"name": "Job ID", "value": info.jobid}
-                        ],
-                        "color": 0x00ffcc
-                    }],
-                    "components": [{
-                        "type": 1,
-                        "components": [
-                            {
-                                "type": 2,
-                                "style": 5,
-                                "label": "Profile",
-                                "url": f"https://www.roblox.com/users/{info.userid}/profile"
-                            },
-                            {
-                                "type": 2,
-                                "style": 5,
-                                "label": "Join Game",
-                                "url": f"https://www.roblox.com/games/start?placeId={info.placeid}&gameId={info.jobid}"
-                            }
-                        ]
-                    }]
-                }
-            )
-    return {"status": "ok"}
+    requests.post(f"https://discord.com/api/v10/channels/{log_channel_id}/messages", headers=headers, json=message)
+    return {"detail": "Reported"}
+
 
 @app.post("/disconnect")
-async def disconnect_user(data: Disconnect):
-    userid = data.userid
-    if userid in user_channels:
-        channel_id = user_channels[userid]
-        r = requests.delete(f"https://discord.com/api/v10/channels/{channel_id}", headers=headers)
-        if r.status_code in [200, 204]:
-            print(f"[CHANNEL DELETED] Channel for {userid} deleted.")
-        else:
-            print(f"[ERROR] Couldn't delete {userid}'s channel. Status: {r.status_code}")
-        del user_channels[userid]
-    return {"status": "ok"}
+async def disconnect(disconnect: Disconnect):
+    return {"detail": "Disconnected"}
 
-@app.post("/auth")
-async def auth(request: Request):
-    data = await request.json()
-    if data.get("password") == dashboard_password:
-        return {"status": "ok"}
-    raise HTTPException(status_code=403, detail="Unauthorized")
 
 @app.get("/logs")
-async def get_logs(request: Request):
-    auth = request.headers.get("Authorization")
-    if auth != dashboard_password:
+async def get_logs(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if credentials.credentials != dashboard_password:
         raise HTTPException(status_code=403, detail="Unauthorized")
     return logs
 
-dashboard_path = pathlib.Path("dashboard")
-if dashboard_path.exists() and dashboard_path.is_dir():
-    app.mount("/", StaticFiles(directory="dashboard", html=True), name="dashboard")
+
+@app.post("/auth")
+async def auth(req: Dict[str, str]):
+    if req.get("password") != dashboard_password:
+        raise HTTPException(status_code=401, detail="Invalid password")
+    return {"message": "Authorized"}
+
+
+@app.delete("/logs/{userid}")
+async def delete_log(userid: str, creds: HTTPAuthorizationCredentials = Depends(security)):
+    global logs
+    logs = [log for log in logs if log["userid"] != userid]
+    return {"detail": "Deleted"}
+
+
+@app.post("/send_log/{userid}")
+async def send_log(userid: str, creds: HTTPAuthorizationCredentials = Depends(security)):
+    for log in logs:
+        if log["userid"] == userid:
+            message = {
+                "content": f"<@&{admin_role_id}>",
+                "embeds": [{
+                    "title": log["username"],
+                    "description": f"{log['displayname']} is playing **{log['game']}**\nPlace ID: {log['placeid']}\nJob ID: {log['jobid']}",
+                    "thumbnail": {"url": log["thumbnail"]}
+                }]
+            }
+            requests.post(f"https://discord.com/api/v10/channels/{log_channel_id}/messages",
+                          headers=headers, json=message)
+            return {"detail": "Sent"}
+    raise HTTPException(status_code=404, detail="Log not found")
+
+
+app.mount("/", StaticFiles(directory="dashboard", html=True), name="dashboard")
