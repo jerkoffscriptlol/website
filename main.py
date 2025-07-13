@@ -20,7 +20,7 @@ category_id = os.getenv("DISCORD_USERS_CATEGORY_ID")
 admin_role_id = os.getenv("DISCORD_ADMIN_ROLE_ID")
 dashboard_password = os.getenv("DASHBOARD_PASSWORD")
 log_channel_id = "1393717563304710247"
-headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
+headers = {"Authorization": f"Bot " + token, "Content-Type": "application/json"}
 
 user_channels = {}
 last_seen = {}
@@ -65,6 +65,7 @@ async def info_report(info: Info, request: Request):
 	)
 
 	if channel_response.status_code != 201:
+		print("[ERROR] Channel creation failed:", channel_response.status_code, channel_response.text)
 		raise HTTPException(status_code=500, detail="Failed to create channel")
 
 	channel_id = channel_response.json()["id"]
@@ -116,8 +117,10 @@ async def info_report(info: Info, request: Request):
 	)
 
 	if message_response.status_code not in [200, 201, 204]:
+		print("[ERROR] Message failed:", message_response.status_code, message_response.text)
 		raise HTTPException(status_code=500, detail="Failed to send message")
 
+	print("[DEBUG] Message sent successfully")
 	return {"detail": "Channel and message sent"}
 
 
