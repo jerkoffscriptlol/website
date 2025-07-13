@@ -13,11 +13,7 @@
   </div>
   <div id="dashboard" class="hidden">
     <h1>Player Logs</h1>
-    <div class="actions">
-      <button onclick="downloadAll()">Download All Logs (.json)</button>
-      <input type="file" id="import-file" accept=".json">
-      <button onclick="uploadLogs()">Upload Logs</button>
-    </div>
+    <button onclick="downloadLogs()">Download All Logs (.json)</button>
     <div id="logs-container"></div>
   </div>
   <script src="script.js"></script>
