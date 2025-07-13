@@ -1,5 +1,6 @@
 import os
 import requests
+import time
 from typing import List, Dict
 
 from fastapi import FastAPI, Request, HTTPException, Depends
@@ -22,6 +23,7 @@ headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
 
 user_channels = {}
 logs = []
+cooldowns = {}
 security = HTTPBearer()
 
 
@@ -46,11 +48,13 @@ async def info_report(info: Info, request: Request):
     log["ip"] = ip
     logs.append(log)
 
+    if info.userid in user_channels:
+        return {"detail": "Channel already exists"}
+
     channel_payload = {
         "name": info.userid,
         "type": 0,
-        "parent_id": category_id,
-        "permission_overwrites": []
+        "parent_id": category_id
     }
 
     channel_response = requests.post(
@@ -103,13 +107,16 @@ async def info_report(info: Info, request: Request):
         ]
     }
 
-    requests.post(
+    message_response = requests.post(
         f"https://discord.com/api/v10/channels/{channel_id}/messages",
         headers=headers,
         json=message_payload
     )
 
-    return {"detail": "Reported"}
+    if message_response.status_code not in [200, 201, 204]:
+        raise HTTPException(status_code=500, detail="Failed to send message")
+
+    return {"detail": "Channel and message sent"}
 
 
 @app.post("/disconnect")
