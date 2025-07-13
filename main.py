@@ -3,7 +3,7 @@ import time
 import threading
 import requests
 from typing import List, Dict
-from fastapi import FastAPI, Request, HTTPException, Depends, File, UploadFile
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -26,6 +26,7 @@ logs = []
 last_ping = {}
 security = HTTPBearer()
 
+
 class Info(BaseModel):
     userid: str
     username: str
@@ -35,8 +36,10 @@ class Info(BaseModel):
     jobid: str
     thumbnail: str
 
+
 class Disconnect(BaseModel):
     userid: str
+
 
 @app.post("/info_report")
 async def info_report(info: Info, request: Request):
@@ -44,12 +47,6 @@ async def info_report(info: Info, request: Request):
     existing = next((x for x in logs if x["userid"] == info.userid), None)
     if not existing:
         log = info.dict()
-        geo = requests.get(f"http://ip-api.com/json/{ip}").json()
-        log["country"] = geo.get("country")
-        log["region"] = geo.get("regionName")
-        log["city"] = geo.get("city")
-        log["isp"] = geo.get("isp")
-        log["timestamp"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         log["ip"] = ip
         logs.append(log)
     last_ping[info.userid] = time.time()
@@ -84,12 +81,7 @@ async def info_report(info: Info, request: Request):
             {"name": "User ID", "value": info.userid or "N/A", "inline": False},
             {"name": "Game", "value": info.game or "N/A", "inline": False},
             {"name": "Place ID", "value": info.placeid or "N/A", "inline": False},
-            {"name": "Job ID", "value": info.jobid or "N/A", "inline": False},
-            {"name": "Country", "value": geo.get("country", "N/A"), "inline": False},
-            {"name": "Region", "value": geo.get("regionName", "N/A"), "inline": False},
-            {"name": "City", "value": geo.get("city", "N/A"), "inline": False},
-            {"name": "ISP", "value": geo.get("isp", "N/A"), "inline": False},
-            {"name": "Timestamp", "value": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "inline": False}
+            {"name": "Job ID", "value": info.jobid or "N/A", "inline": False}
         ],
         "thumbnail": {
             "url": info.thumbnail if info.thumbnail.startswith("https://") else "https://tr.rbxcdn.com/default_thumbnail.png"
@@ -131,10 +123,12 @@ async def info_report(info: Info, request: Request):
 
     return {"detail": "Channel and message sent"}
 
+
 @app.post("/ping")
 async def ping_user(ping: Disconnect):
     last_ping[ping.userid] = time.time()
     return {"detail": "Ping OK"}
+
 
 @app.post("/disconnect")
 async def disconnect(disconnect: Disconnect):
@@ -154,11 +148,13 @@ async def disconnect(disconnect: Disconnect):
         last_ping.pop(user_id, None)
     return {"detail": "Channel deleted if existed"}
 
+
 @app.get("/logs")
 async def get_logs(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if credentials.credentials != dashboard_password:
         raise HTTPException(status_code=403, detail="Unauthorized")
     return logs
+
 
 @app.post("/auth")
 async def auth(req: Dict[str, str]):
@@ -166,11 +162,13 @@ async def auth(req: Dict[str, str]):
         raise HTTPException(status_code=401, detail="Invalid password")
     return {"message": "Authorized"}
 
+
 @app.delete("/logs/{userid}")
 async def delete_log(userid: str, creds: HTTPAuthorizationCredentials = Depends(security)):
     global logs
     logs = [log for log in logs if log["userid"] != userid]
     return {"detail": "Deleted"}
+
 
 @app.post("/send_log/{userid}")
 async def send_log(userid: str, creds: HTTPAuthorizationCredentials = Depends(security)):
@@ -185,12 +183,7 @@ async def send_log(userid: str, creds: HTTPAuthorizationCredentials = Depends(se
                     {"name": "User ID", "value": log["userid"] or "N/A", "inline": False},
                     {"name": "Game", "value": log["game"] or "N/A", "inline": False},
                     {"name": "Place ID", "value": log["placeid"] or "N/A", "inline": False},
-                    {"name": "Job ID", "value": log["jobid"] or "N/A", "inline": False},
-                    {"name": "Country", "value": log.get("country", "N/A"), "inline": False},
-                    {"name": "Region", "value": log.get("region", "N/A"), "inline": False},
-                    {"name": "City", "value": log.get("city", "N/A"), "inline": False},
-                    {"name": "ISP", "value": log.get("isp", "N/A"), "inline": False},
-                    {"name": "Timestamp", "value": log.get("timestamp", "N/A"), "inline": False}
+                    {"name": "Job ID", "value": log["jobid"] or "N/A", "inline": False}
                 ],
                 "thumbnail": {
                     "url": log["thumbnail"] if log["thumbnail"].startswith("https://") else "https://tr.rbxcdn.com/default_thumbnail.png"
@@ -229,19 +222,6 @@ async def send_log(userid: str, creds: HTTPAuthorizationCredentials = Depends(se
             return {"detail": "Sent"}
     raise HTTPException(status_code=404, detail="Log not found")
 
-@app.post("/import_logs")
-async def import_logs(file: UploadFile, credentials: HTTPAuthorizationCredentials = Depends(security)):
-    if credentials.credentials != dashboard_password:
-        raise HTTPException(status_code=403, detail="Unauthorized")
-    contents = await file.read()
-    try:
-        data = requests.utils.json.loads(contents)
-        if isinstance(data, list):
-            logs.extend(data)
-            return {"detail": f"Imported {len(data)} logs."}
-        raise ValueError
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON file")
 
 def monitor_disconnects():
     while True:
