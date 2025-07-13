@@ -23,12 +23,32 @@ async function loadLogs() {
   const table = document.querySelector("#logTable tbody");
   table.innerHTML = "";
   data.forEach(entry => {
-    let row = `<tr>
+    let row = document.createElement("tr");
+    row.innerHTML = `
       <td>${entry.username}</td>
       <td>${entry.displayname}</td>
       <td>${entry.game}</td>
       <td>${entry.ip || "N/A"}</td>
-    </tr>`;
-    table.innerHTML += row;
+      <td>
+        <button onclick="deleteLog('${entry.userid}')">Delete</button>
+        <button onclick="sendToDiscord('${entry.userid}')">Send</button>
+      </td>
+    `;
+    table.appendChild(row);
+  });
+}
+
+async function deleteLog(userid) {
+  await fetch(`/logs/${userid}`, {
+    method: "DELETE",
+    headers: { "Authorization": sessionStorage.getItem("auth") }
+  });
+  loadLogs();
+}
+
+async function sendToDiscord(userid) {
+  await fetch(`/send_log/${userid}`, {
+    method: "POST",
+    headers: { "Authorization": sessionStorage.getItem("auth") }
   });
 }
