@@ -1,141 +1,40 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>notarat Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body {
-      background-color: #0f0f0f;
-      color: white;
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 2rem;
-    }
-    .hidden { display: none; }
-    .card {
-      background-color: #1a1a1a;
-      border-radius: 10px;
-      padding: 1rem;
-      margin-bottom: 1rem;
-      box-shadow: 0 0 5px rgba(0,0,0,0.2);
-    }
-    button {
-      background-color: #3b82f6;
-      border: none;
-      border-radius: 5px;
-      padding: 0.5rem 1rem;
-      color: white;
-      cursor: pointer;
-      margin-right: 0.5rem;
-    }
-    button:hover {
-      background-color: #2563eb;
-    }
-    input {
-      background: #1f1f1f;
-      color: white;
-      padding: 0.5rem;
-      border: none;
-      border-radius: 5px;
-      margin-right: 1rem;
-    }
-    .log-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-    .log-item {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-    }
-    img.thumb {
-      width: 80px;
-      height: 80px;
-      border-radius: 10px;
-      object-fit: cover;
-    }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>iqsm Dashboard</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="login">
-    <h1 style="font-size: 1.5rem; margin-bottom: 1rem;">Enter Password</h1>
-    <input type="password" id="pwd" placeholder="Password">
-    <button onclick="auth()">Login</button>
-    <p id="err" style="color: red; margin-top: 1rem;"></p>
+  <div class="container">
+    <div id="login">
+      <h1>Login</h1>
+      <input type="password" id="password" placeholder="Password" />
+      <button onclick="login()">Login</button>
+    </div>
+
+    <div id="dashboard" class="hidden">
+      <h1>Logs</h1>
+      <table id="logTable">
+        <thead>
+          <tr>
+            <th>Thumbnail</th>
+            <th>Username</th>
+            <th>Display Name</th>
+            <th>User ID</th>
+            <th>Game</th>
+            <th>Place ID</th>
+            <th>Job ID</th>
+            <th>IP</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </div>
 
-  <div id="dashboard" class="hidden">
-    <h1 style="font-size: 2rem; margin-bottom: 2rem;">📋 Logged Players</h1>
-    <div id="logs" class="log-grid"></div>
-  </div>
-
-  <script>
-    async function auth() {
-      const pwd = document.getElementById("pwd").value;
-      const res = await fetch("/auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: pwd })
-      });
-      if (res.ok) {
-        sessionStorage.setItem("auth", pwd);
-        document.getElementById("login").classList.add("hidden");
-        document.getElementById("dashboard").classList.remove("hidden");
-        loadLogs();
-      } else {
-        document.getElementById("err").innerText = "Wrong password";
-      }
-    }
-
-    async function loadLogs() {
-      const logsContainer = document.getElementById("logs");
-      logsContainer.innerHTML = "Loading...";
-      const res = await fetch("/logs", {
-        headers: { "Authorization": sessionStorage.getItem("auth") }
-      });
-      const data = await res.json();
-      logsContainer.innerHTML = "";
-      for (const log of data.reverse()) {
-        const el = document.createElement("div");
-        el.className = "card log-item";
-        el.innerHTML = `
-          <img src="${log.thumbnail}" class="thumb">
-          <div>
-            <p><b>${log.username}</b> (${log.displayname})</p>
-            <p style="font-size: 0.9rem;">Game: ${log.game}</p>
-            <p style="font-size: 0.8rem; color: gray;">Place ID: ${log.placeid} • Job ID: ${log.jobid}</p>
-            <div style="margin-top: 0.5rem;">
-              <button onclick="sendLog('${log.userid}')">📨 View</button>
-              <button onclick="deleteLog('${log.userid}')">🗑️ Delete</button>
-            </div>
-          </div>
-        `;
-        logsContainer.appendChild(el);
-      }
-    }
-
-    async function deleteLog(userid) {
-      await fetch(`/logs/${userid}`, {
-        method: "DELETE",
-        headers: { "Authorization": sessionStorage.getItem("auth") }
-      });
-      loadLogs();
-    }
-
-    async function sendLog(userid) {
-      await fetch(`/send_log/${userid}`, {
-        method: "POST",
-        headers: { "Authorization": sessionStorage.getItem("auth") }
-      });
-    }
-
-    if (sessionStorage.getItem("auth")) {
-      document.getElementById("login").classList.add("hidden");
-      document.getElementById("dashboard").classList.remove("hidden");
-      loadLogs();
-    }
-  </script>
+  <script src="script.js"></script>
 </body>
 </html>
