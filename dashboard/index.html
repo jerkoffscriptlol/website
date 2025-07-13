@@ -13,17 +13,16 @@
       padding: 2rem;
     }
     #login, #dashboard {
-      max-width: 600px;
+      max-width: 800px;
       margin: auto;
       padding: 2rem;
       background: #1a1a1a;
       border-radius: 10px;
       box-shadow: 0 0 20px rgba(255,255,255,0.1);
     }
-    input[type="password"], button {
-      width: 100%;
-      padding: 1rem;
-      margin-top: 1rem;
+    input[type="password"], button, input[type="text"] {
+      padding: 0.75rem;
+      margin: 0.5rem;
       font-size: 1rem;
     }
     table {
@@ -36,6 +35,13 @@
       border-bottom: 1px solid #333;
     }
     .hidden { display: none; }
+    .actions button {
+      margin-right: 0.5rem;
+    }
+    img.thumb {
+      border-radius: 8px;
+      height: 60px;
+    }
   </style>
 </head>
 <body>
@@ -48,14 +54,107 @@
 
   <div id="dashboard" class="hidden">
     <h2>iqsm. Logs</h2>
+    <input type="text" id="search" placeholder="Search by username..." oninput="loadLogs()">
     <table id="logTable">
       <thead>
-        <tr><th>Username</th><th>Display Name</th><th>Game</th><th>IP</th></tr>
+        <tr>
+          <th>Thumbnail</th>
+          <th>Username</th>
+          <th>Actions</th>
+        </tr>
       </thead>
       <tbody></tbody>
     </table>
   </div>
 
-  <script src="script.js"></script>
+  <div id="logModal" class="hidden" style="background:#000;padding:2rem;margin:2rem auto;max-width:600px;border:1px solid #444;border-radius:10px;">
+    <h3>Log Details</h3>
+    <pre id="logDetails" style="white-space: pre-wrap;"></pre>
+    <button onclick="closeModal()">Close</button>
+  </div>
+
+  <script>
+    let logs = [];
+
+    async function login() {
+      const pwd = document.getElementById("password").value;
+      const res = await fetch("/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pwd })
+      });
+      if (res.ok) {
+        sessionStorage.setItem("auth", pwd);
+        document.getElementById("login").classList.add("hidden");
+        document.getElementById("dashboard").classList.remove("hidden");
+        loadLogs();
+      } else {
+        document.getElementById("error").innerText = "Incorrect password.";
+      }
+    }
+
+    async function loadLogs() {
+      const res = await fetch("/logs", {
+        headers: { "Authorization": sessionStorage.getItem("auth") }
+      });
+      logs = await res.json();
+      const query = document.getElementById("search").value.toLowerCase();
+      const table = document.querySelector("#logTable tbody");
+      table.innerHTML = "";
+      logs.filter(entry => entry.username.toLowerCase().includes(query)).forEach((entry, i) => {
+        let row = document.createElement("tr");
+        let thumb = document.createElement("td");
+        thumb.innerHTML = `<img src="${entry.thumbnail}" class="thumb">`;
+        let usernameCell = document.createElement("td");
+        usernameCell.textContent = entry.username;
+        let actionCell = document.createElement("td");
+        actionCell.className = "actions";
+        let viewBtn = document.createElement("button");
+        viewBtn.textContent = "View";
+        viewBtn.onclick = () => showLogDetails(i);
+        let deleteBtn = document.createElement("button");
+        deleteBtn.textContent = "Delete";
+        deleteBtn.onclick = () => deleteLog(entry.userid);
+        actionCell.appendChild(viewBtn);
+        actionCell.appendChild(deleteBtn);
+        row.appendChild(thumb);
+        row.appendChild(usernameCell);
+        row.appendChild(actionCell);
+        table.appendChild(row);
+      });
+    }
+
+    function showLogDetails(index) {
+      const entry = logs[index];
+      const details = `
+Username: ${entry.username}
+Display Name: ${entry.displayname}
+User ID: ${entry.userid}
+Game: ${entry.game}
+Place ID: ${entry.placeid}
+Job ID: ${entry.jobid}
+IP Address: ${entry.ip}
+Thumbnail: ${entry.thumbnail}
+      `;
+      document.getElementById("logDetails").innerText = details;
+      document.getElementById("logModal").classList.remove("hidden");
+    }
+
+    function closeModal() {
+      document.getElementById("logModal").classList.add("hidden");
+    }
+
+    async function deleteLog(userid) {
+      await fetch("/delete_log", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": sessionStorage.getItem("auth")
+        },
+        body: JSON.stringify({ userid })
+      });
+      loadLogs();
+    }
+  </script>
 </body>
 </html>
