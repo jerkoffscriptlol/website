@@ -1,12 +1,17 @@
 import os
 import requests
+import pathlib
+from typing import List, Dict
+
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from pydantic import BaseModel
-from typing import List, Dict
-import pathlib
+
+import discord
+from discord.ext import commands
+import threading
 
 load_dotenv()
 
@@ -20,8 +25,11 @@ log_channel_id = "1393717563304710247"
 headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
 
 user_channels = {}
-cmd_queue: Dict[str, List[Dict[str, str]]] = {}
 logs = []
+
+intents = discord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix="!", intents=intents)
 
 class Info(BaseModel):
     userid: str
@@ -61,6 +69,7 @@ async def info_report(info: Info, request: Request):
                 f"https://discord.com/api/v10/channels/{channel_id}/messages",
                 headers=headers,
                 json={
+                    "content": f"<@&{allowed_role_id}>",
                     "embeds": [{
                         "title": f"{info.displayname} joined",
                         "thumbnail": {"url": info.thumbnail},
@@ -98,7 +107,11 @@ async def disconnect_user(data: Disconnect):
     userid = data.userid
     if userid in user_channels:
         channel_id = user_channels[userid]
-        requests.delete(f"https://discord.com/api/v10/channels/{channel_id}", headers=headers)
+        r = requests.delete(f"https://discord.com/api/v10/channels/{channel_id}", headers=headers)
+        if r.status_code == 200 or r.status_code == 204:
+            print(f"[CHANNEL DELETED] {userid}'s channel was removed.")
+        else:
+            print(f"[DELETE FAILED] Could not delete channel for {userid}. Status code: {r.status_code}")
         del user_channels[userid]
     return {"status": "ok"}
 
@@ -119,3 +132,16 @@ async def get_logs(request: Request):
 dashboard_path = pathlib.Path("dashboard")
 if dashboard_path.exists() and dashboard_path.is_dir():
     app.mount("/", StaticFiles(directory="dashboard", html=True), name="dashboard")
+
+@bot.event
+async def on_ready():
+    print(f"[BOT ONLINE] Logged in as {bot.user} (ID: {bot.user.id})")
+
+@bot.command()
+async def ping(ctx):
+    await ctx.send("pong 🏓")
+
+def run_bot():
+    bot.run(token)
+
+threading.Thread(target=run_bot).start()
