@@ -41,13 +41,13 @@ class Disconnect(BaseModel):
 
 @app.post("/info_report")
 async def info_report(info: Info, request: Request):
+    if info.userid in user_channels:
+        return {"detail": "Channel already exists"}
+
     ip = request.client.host
     log = info.dict()
     log["ip"] = ip
     logs.append(log)
-
-    if info.userid in user_channels:
-        return {"detail": "Channel already exists"}
 
     channel_payload = {
         "name": info.userid,
