@@ -113,7 +113,6 @@ async def info_report(info: Info, request: Request):
     )
 
     if message_response.status_code not in [200, 201, 204]:
-        print("Message error:", message_response.text)
         raise HTTPException(status_code=500, detail="Failed to send message")
 
     return {"detail": "Channel and message sent"}
