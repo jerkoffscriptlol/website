@@ -1,29 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>iqsm. Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body {
-      background-color: #111;
-      color: #eee;
-      font-family: Arial, sans-serif;
+      background-color: #0e0e0e;
+      color: #fff;
+      font-family: 'Segoe UI', sans-serif;
       margin: 0;
       padding: 2rem;
     }
     #login, #dashboard {
-      max-width: 800px;
+      max-width: 900px;
       margin: auto;
+      background: #1c1c1c;
       padding: 2rem;
-      background: #1a1a1a;
-      border-radius: 10px;
-      box-shadow: 0 0 20px rgba(255,255,255,0.1);
+      border-radius: 12px;
+      box-shadow: 0 0 20px rgba(255,255,255,0.05);
     }
-    input[type="password"], button, input[type="text"] {
-      padding: 0.75rem;
-      margin: 0.5rem;
+    input, button {
+      padding: 0.75rem 1rem;
       font-size: 1rem;
+      margin: 0.5rem 0;
+      border: none;
+      border-radius: 6px;
+    }
+    input[type="password"], input[type="text"] {
+      width: 100%;
+      background: #111;
+      color: #fff;
+    }
+    button {
+      background-color: #333;
+      color: #fff;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #555;
     }
     table {
       width: 100%;
@@ -31,16 +46,29 @@
       margin-top: 1rem;
     }
     th, td {
-      padding: 0.5rem;
-      border-bottom: 1px solid #333;
+      padding: 0.75rem;
+      border-bottom: 1px solid #444;
+      text-align: left;
+      vertical-align: middle;
     }
-    .hidden { display: none; }
+    .thumb {
+      height: 50px;
+      width: 50px;
+      border-radius: 6px;
+    }
     .actions button {
       margin-right: 0.5rem;
     }
-    img.thumb {
-      border-radius: 8px;
-      height: 60px;
+    .hidden {
+      display: none;
+    }
+    #logModal {
+      background: #111;
+      padding: 2rem;
+      max-width: 600px;
+      margin: 2rem auto;
+      border-radius: 10px;
+      border: 1px solid #444;
     }
   </style>
 </head>
@@ -54,7 +82,7 @@
 
   <div id="dashboard" class="hidden">
     <h2>iqsm. Logs</h2>
-    <input type="text" id="search" placeholder="Search by username..." oninput="loadLogs()">
+    <input type="text" id="search" placeholder="Search by username..." oninput="loadLogs()" />
     <table id="logTable">
       <thead>
         <tr>
@@ -67,7 +95,7 @@
     </table>
   </div>
 
-  <div id="logModal" class="hidden" style="background:#000;padding:2rem;margin:2rem auto;max-width:600px;border:1px solid #444;border-radius:10px;">
+  <div id="logModal" class="hidden">
     <h3>Log Details</h3>
     <pre id="logDetails" style="white-space: pre-wrap;"></pre>
     <button onclick="closeModal()">Close</button>
@@ -102,24 +130,36 @@
       const table = document.querySelector("#logTable tbody");
       table.innerHTML = "";
       logs.filter(entry => entry.username.toLowerCase().includes(query)).forEach((entry, i) => {
-        let row = document.createElement("tr");
-        let thumb = document.createElement("td");
-        thumb.innerHTML = `<img src="${entry.thumbnail}" class="thumb">`;
-        let usernameCell = document.createElement("td");
-        usernameCell.textContent = entry.username;
-        let actionCell = document.createElement("td");
-        actionCell.className = "actions";
-        let viewBtn = document.createElement("button");
+        const row = document.createElement("tr");
+
+        const thumb = document.createElement("td");
+        thumb.innerHTML = `<img src="${entry.thumbnail}" class="thumb" />`;
+
+        const username = document.createElement("td");
+        username.textContent = entry.username;
+
+        const actions = document.createElement("td");
+        actions.className = "actions";
+
+        const viewBtn = document.createElement("button");
         viewBtn.textContent = "View";
         viewBtn.onclick = () => showLogDetails(i);
-        let deleteBtn = document.createElement("button");
+
+        const deleteBtn = document.createElement("button");
         deleteBtn.textContent = "Delete";
         deleteBtn.onclick = () => deleteLog(entry.userid);
-        actionCell.appendChild(viewBtn);
-        actionCell.appendChild(deleteBtn);
+
+        const sendBtn = document.createElement("button");
+        sendBtn.textContent = "Send";
+        sendBtn.onclick = () => sendToDiscord(entry.userid);
+
+        actions.appendChild(viewBtn);
+        actions.appendChild(deleteBtn);
+        actions.appendChild(sendBtn);
+
         row.appendChild(thumb);
-        row.appendChild(usernameCell);
-        row.appendChild(actionCell);
+        row.appendChild(username);
+        row.appendChild(actions);
         table.appendChild(row);
       });
     }
@@ -145,15 +185,22 @@ Thumbnail: ${entry.thumbnail}
     }
 
     async function deleteLog(userid) {
-      await fetch("/delete_log", {
-        method: "POST",
+      await fetch(`/logs/${userid}`, {
+        method: "DELETE",
         headers: {
-          "Content-Type": "application/json",
           "Authorization": sessionStorage.getItem("auth")
-        },
-        body: JSON.stringify({ userid })
+        }
       });
       loadLogs();
+    }
+
+    async function sendToDiscord(userid) {
+      await fetch(`/send_log/${userid}`, {
+        method: "POST",
+        headers: {
+          "Authorization": sessionStorage.getItem("auth")
+        }
+      });
     }
   </script>
 </body>
