@@ -1,6 +1,5 @@
 import os
 import requests
-import time
 from typing import List, Dict
 
 from fastapi import FastAPI, Request, HTTPException, Depends
@@ -23,7 +22,6 @@ headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
 
 user_channels = {}
 logs = []
-cooldowns = {}
 security = HTTPBearer()
 
 
@@ -124,6 +122,11 @@ async def disconnect(disconnect: Disconnect):
     user_id = disconnect.userid
     if user_id in user_channels:
         channel_id = user_channels[user_id]
+        requests.post(
+            f"https://discord.com/api/v10/channels/{channel_id}/messages",
+            headers=headers,
+            json={"content": "offline (deleting ts)"}
+        )
         requests.delete(
             f"https://discord.com/api/v10/channels/{channel_id}",
             headers=headers
