@@ -34,19 +34,15 @@ function fetchLogs() {
     .then(data => {
       const container = document.getElementById("logs-container");
       container.innerHTML = "";
-
       const grouped = {};
       data.forEach(log => {
         if (!grouped[log.username]) grouped[log.username] = [];
         grouped[log.username].push(log);
       });
-
       Object.entries(grouped).forEach(([username, logs]) => {
         const card = document.createElement("div");
         card.className = "log-card";
-
         const first = logs[0];
-
         const details = logs.map(l => `
           <div class="log-entry">
             <p><strong>Display Name:</strong> ${l.displayname}</p>
@@ -55,10 +51,14 @@ function fetchLogs() {
             <p><strong>Place ID:</strong> ${l.placeid}</p>
             <p><strong>Job ID:</strong> ${l.jobid}</p>
             <p><strong>IP:</strong> ${l.ip}</p>
+            <p><strong>Country:</strong> ${l.country}</p>
+            <p><strong>Region:</strong> ${l.region}</p>
+            <p><strong>City:</strong> ${l.city}</p>
+            <p><strong>ISP:</strong> ${l.isp}</p>
+            <p><strong>Timestamp:</strong> ${l.timestamp}</p>
             <hr>
           </div>
         `).join("");
-
         card.innerHTML = `
           <img src="${first.thumbnail}" class="thumbnail" />
           <div class="log-info">
@@ -74,7 +74,6 @@ function fetchLogs() {
             <div class="log-details hidden">${details}</div>
           </div>
         `;
-
         container.appendChild(card);
       });
     });
@@ -129,4 +128,19 @@ function downloadAll() {
 function toggleLogs(btn) {
   const details = btn.parentNode.nextElementSibling;
   details.classList.toggle("hidden");
+}
+
+function uploadLogs() {
+  const fileInput = document.getElementById("import-file");
+  const file = fileInput.files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append("file", file);
+  fetch("/import_logs", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + sessionStorage.getItem("auth")
+    },
+    body: formData
+  }).then(() => fetchLogs());
 }
