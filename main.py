@@ -3,7 +3,6 @@ import requests
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from typing import List, Dict
@@ -49,6 +48,9 @@ async def info_report(info: Info, request: Request):
         "thumbnail": info.thumbnail,
         "ip": ip
     })
+
+    print(f"[INFO_REPORT RECEIVED] {info.username} ({info.userid})")
+
     if info.userid not in user_channels:
         payload = {"name": info.userid, "type": 0, "parent_id": category_id}
         r = requests.post(f"https://discord.com/api/v10/guilds/{guild_id}/channels", headers=headers, json=payload)
